@@ -1,82 +1,71 @@
 name: Build and deploy Python app to Azure Web App - newTest
 
-
 on:
-push:
-branches:
-- main
-workflow_dispatch:
-
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
-build:
-runs-on: ubuntu-latest
-permissions:
-contents: read # required for actions/checkout
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # required for actions/checkout
 
+    steps:
+      - uses: actions/checkout@v4
 
-steps:
-- uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          cache: 'pip'           # кешування пакунків pip за хешем requirements.txt
 
+      - name: Create and start virtual environment
+        shell: bash
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-- name: Set up Python
-uses: actions/setup-python@v5
-with:
-python-version: '3.9'
-cache: 'pip' # кешування пакунків pip за хешем requirements.txt
+      - name: Run tests with pytest
+        shell: bash
+        run: |
+          source venv/bin/activate
+          python -m pytest
 
+      - name: Upload artifact for deployment jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-app
+          path: |
+            .
+            !venv/
 
-- name: Create and start virtual environment
-shell: bash
-run: |
-python -m venv venv
-source venv/bin/activate
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      id-token: write   # OIDC для входу в Azure без збереження секретів паролів
+      contents: read
 
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: python-app
 
-- name: Run tests with pytest
-shell: bash
-run: |
-source venv/bin/activate
-python -m pytest
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_6E87CA97024443359206D7FA594738B5 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_2758E80F1B5B4CC586A3C85583BEDCF1 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_698C6AA0CDED44D789C2E816E1586DEE }}
 
-
-- name: Upload artifact for deployment jobs
-uses: actions/upload-artifact@v4
-with:
-name: python-app
-path: |
-.
-!venv/
-
-
-deploy:
-runs-on: ubuntu-latest
-needs: build
-permissions:
-id-token: write # OIDC для входу в Azure без збереження секретів паролів
-contents: read
-
-
-steps:
-- name: Download artifact from build job
-uses: actions/download-artifact@v4
-with:
-name: python-app
-
-
-- name: Login to Azure
-uses: azure/login@v2
-with:
-client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_6E87CA97024443359206D7FA594738B5 }}
-tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_2758E80F1B5B4CC586A3C85583BEDCF1 }}
-subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_698C6AA0CDED44D789C2E816E1586DEE }}
-
-
-- name: Deploy to Azure Web App
-uses: azure/webapps-deploy@v3
-with:
-app-name: 'newTest'
-slot-name: 'Production'
-package: '.'
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'newTest'
+          slot-name: 'Production'
+          package: '.'
