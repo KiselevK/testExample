@@ -29,11 +29,20 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run tests with pytest
+      - name: Run tests with pytest (JUnit)
         shell: bash
         run: |
+          mkdir -p test-results
           source venv/bin/activate
-          python -m pytest
+          python -m pytest --junitxml=test-results/pytest-report.xml
+
+      - name: Upload test results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-results
+          path: test-results/
+          retention-days: 7
 
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
