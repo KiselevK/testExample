@@ -29,6 +29,9 @@ jobs:
           python -m venv venv
           source venv/bin/activate
       
+      - name: Run tests with pytest
+        run: pytest
+
       - name: Install dependencies
         run: pip install -r requirements.txt
         
